@@ -22,7 +22,7 @@
    [org.linqs.psl.model.rule UnweightedRule UnweightedGroundRule WeightedGroundRule]
    [org.linqs.psl.model.rule.logical UnweightedGroundLogicalRule
     UnweightedLogicalRule WeightedLogicalRule]
-   [org.linqs.psl.model.term UniqueStringID Variable Term Constant]
+   [org.linqs.psl.model.term UniqueStringID UniqueIntID Variable Term Constant]
    [org.linqs.psl.parser ModelLoader]
    [java.util HashSet]
    ))
@@ -50,9 +50,19 @@
   (Negation. formula))
 
 (defn NEQ [term1 term2]
-  "Return a PSL functional predicate stating that term1 != term2."
+  "Return a PSL predicate stating that term1 != term2."
   (QueryAtom.
    org.linqs.psl.model.predicate.SpecialPredicate/NotEqual
+   (into-array
+    Term
+    (for [a [term1 term2]]
+      (if (symbol? a) (Variable. (name a)) a)))))
+
+(defn LT [term1 term2]
+  "Return a PSL predicate stating that term1 < term2, avoiding
+  symmetric groundings."
+  (QueryAtom.
+   org.linqs.psl.model.predicate.SpecialPredicate/NonSymmetric
    (into-array
     Term
     (for [a [term1 term2]]
@@ -487,9 +497,15 @@
   (for [a args]
     (Variable. (name a))))
 
-(defn uid "Return a Unique ID from the provided DataStore. "
-  ([string]
-   (UniqueStringID. string))
-  ([datastore string]
+(defn uid "Return a Unique ID. "
+  ([obj]
+   (if (instance? java.lang.Long obj)
+     (UniqueIntID. obj)
+     (if (instance? java.lang.Integer obj)
+       (UniqueIntID. obj)
+       (if (instance? java.lang.String obj)
+         (UniqueStringID. obj)
+         (UniqueStringID. (str obj))))))
+  ([datastore obj]
    (log/warn "Unique IDs no longer require data stores")
-   (UniqueStringID. string)))
+   (UniqueStringID. obj)))
