@@ -135,6 +135,11 @@
   [ground-rules rule-name]
   (for [gr ground-rules :when (= (.getName (.getRule gr)) rule-name)] gr))
 
+(defn ground-rules
+  "Return a copy of the ground rules from the given inference app."
+  [inference-app]
+  (vec (.getGroundRules (.getGroundRuleStore inference-app))))
+
 (defn ground-rules-by-name-sort
   "Return a list of ground rules sorted by rule name."
   [ground-rules]
@@ -149,6 +154,22 @@
   collection of ground rules."
   [ground-rules]
   (sort (distinct (for [gr ground-rules] (.getName (.getRule gr))))))
+
+(defn ground-rules-summary
+  "A string summary of ground rules."
+  ;; Without rule name
+  ([ground-rules]
+   (let [outs (new StringBuilder)]
+     (doseq [gr (ground-rules-by-name-sort ground-rules)]
+       (.append outs (.getName (.getRule gr)))
+       (.append outs (cond (instance? UnweightedGroundRule gr)
+                           (str "INFE: " (.getInfeasibility gr))
+                           (instance? WeightedGroundRule gr)
+                           (str "INCO: " (.getIncompatibility gr))))
+       (.append outs (str "CLAS: " (.getSimpleName (.getClass gr))))
+       (.append outs (str "STRI: " gr))
+       (doseq [a (.getAtoms gr)]
+         (.append outs (str "ATOM: " (.getValue a) ":" a)))))))
 
 (defn ground-rules-print-summary
   "Print a summary of ground rules."
