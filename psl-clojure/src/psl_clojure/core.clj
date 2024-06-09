@@ -14,7 +14,7 @@
    [org.linqs.psl.application.groundrulestore AtomRegisterGroundRuleStore]
    [org.linqs.psl.application.inference MPEInference LazyMPEInference]
    [org.linqs.psl.application.util GroundRules Grounding]
-   [org.linqs.psl.database DataStore Database Partition Queries]
+   [org.linqs.psl.database DataStore Database Partition]
    [org.linqs.psl.database.atom PersistedAtomManager]
    [org.linqs.psl.database.rdbms RDBMSDataStore]
    [org.linqs.psl.model.atom QueryAtom]
@@ -138,7 +138,7 @@
 (defn default-inference
   "Return an app for MPE inference using the configuration."
   [model database config-bundle]
-  (LazyMPEInference. model database config-bundle))
+  (LazyMPEInference. model database))
 
 (defn ground-rules-by-name
   "Return all ground rules from a given collection with the given name."
@@ -253,7 +253,7 @@
   "Call mpeInference on the inference app."
   [inference-app]
   (log/info "inference:: ::starting")
-  (let [result (.mpeInference inference-app)]
+  (let [result (.inference inference-app)]
     (log/info "inference:: ::done")
     result))
 
@@ -293,7 +293,7 @@
         dbw (open-db datastore model [part-to] part-to)]
     (try
       (doseq [pnam preds]
-        (let [atoms (Queries/getAllAtoms dbr (p model pnam))]
+        (let [atoms (.getAllGroundAtoms dbr (p model pnam))]
           (doseq [atom atoms]
             (.commit dbw atom))))
       nil
@@ -413,7 +413,7 @@
   "Read a table from the PSL DB"
   ;; With a supplied database
   ([model db pred-name include-value]
-   (let [atoms (Queries/getAllAtoms db (p model pred-name))
+   (let [atoms (.getAllGroundAtoms db (p model pred-name))
          col-ns (pred-col-names model pred-name)]
      (if include-value
        (in/dataset (conj col-ns :value)
@@ -447,7 +447,7 @@
        (let
            [;; Transform tvals to [.25,.75]
             atoms
-            (for [atom (cu/dbgtim (Queries/getAllAtoms database rv-pred))]
+            (for [atom (cu/dbgtim (.getAllGroundAtoms database rv-pred))]
               (let [old-val (.getValue atom)
                     new-val (->> old-val
                                  (* 0.5)
@@ -486,7 +486,7 @@
   [database open-predicates]
   (log/infof "round:: ::starting")
   (doseq [rv-pred open-predicates]
-    (let [atoms (Queries/getAllAtoms database rv-pred)]
+    (let [atoms (.getAllGroundAtoms database rv-pred)]
       (doseq [atom atoms]           
         (let [val-new (if (> (rand) (.getValue atom)) 0 1)]
           (.setValue atom val-new) 
