@@ -11,9 +11,8 @@
    )
   (:import
    [psl_clojure Model]
-   [org.linqs.psl.application.groundrulestore AtomRegisterGroundRuleStore]
+   [org.linqs.psl.grounding AtomRegisterGroundRuleStore GroundRules Grounding]
    [org.linqs.psl.application.inference MPEInference LazyMPEInference]
-   [org.linqs.psl.application.util GroundRules Grounding]
    [org.linqs.psl.database DataStore Database Partition]
    [org.linqs.psl.database.atom PersistedAtomManager]
    [org.linqs.psl.database.rdbms RDBMSDataStore]
@@ -52,7 +51,7 @@
 (defn NEQ [term1 term2]
   "Return a PSL predicate stating that term1 != term2."
   (QueryAtom.
-   org.linqs.psl.model.predicate.SpecialPredicate/NotEqual
+   org.linqs.psl.model.predicate.GroundingOnlyPredicate/NotEqual
    (into-array
     Term
     (for [a [term1 term2]]
@@ -62,7 +61,7 @@
   "Return a PSL predicate stating that term1 < term2, avoiding
   symmetric groundings."
   (QueryAtom.
-   org.linqs.psl.model.predicate.SpecialPredicate/NonSymmetric
+   org.linqs.psl.model.predicate.GroundingOnlyPredicate/NonSymmetric
    (into-array
     Term
     (for [a [term1 term2]]
@@ -471,7 +470,7 @@
                          (reduce
                           +
                           (for [gr (.getRegisteredGroundRules mgrs atom)]
-                            (GroundRules/getExpectedWeightedLogicalCompatibility
+                            (GroundRules/getExpectedWeightedCompatibility
                              gr)))]
                       (.setValue atom val-old) ; Restore old value
                       {:val val-new :score score})))
