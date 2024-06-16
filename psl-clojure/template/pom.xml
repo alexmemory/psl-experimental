@@ -3,7 +3,7 @@
   <groupId>psl-clojure</groupId>
   <artifactId>lein-template</artifactId>
   <packaging>jar</packaging>
-  <version>2.2.0</version>
+  <version>2.3.0</version>
   <name>lein-template</name>
   <description>FIXME: write description</description>
   <url>http://example.com/FIXME</url>

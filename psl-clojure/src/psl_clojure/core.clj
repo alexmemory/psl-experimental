@@ -11,8 +11,8 @@
    )
   (:import
    [psl_clojure Model]
-   [org.linqs.psl.grounding AtomRegisterGroundRuleStore GroundRules Grounding]
-   [org.linqs.psl.application.inference MPEInference LazyMPEInference]
+   [org.linqs.psl.grounding MemoryGroundRuleStore GroundRules Grounding]
+   [org.linqs.psl.application.inference.mpe MPEInference LazyMPEInference]
    [org.linqs.psl.database DataStore Database Partition]
    [org.linqs.psl.database.atom PersistedAtomManager]
    [org.linqs.psl.database.rdbms RDBMSDataStore]
@@ -27,6 +27,11 @@
    ))
 
 ;;; ================== Building PSL models ===========================
+
+(defn p
+  "Get a predicate object"
+  [pred-name]
+  (org.linqs.psl.model.predicate.StandardPredicate/get pred-name))
 
 (defn AND
   "Return a PSL conjunction formula over given formulas."
@@ -71,12 +76,12 @@
   "Add the specified predicate to the model."
   [model pred-name argmap]
   `(do
-     (.add ~model                     ; Add the predicate to the model
-           (java.util.HashMap.
-            (assoc ~argmap "predicate" (name '~pred-name)))) ; Add 'predicate'
+     (.addPredicate ~model                     ; Add the predicate to the model
+                    (java.util.HashMap.
+                     (assoc ~argmap "predicate" (name '~pred-name)))) ; Add 'predicate'
      (defn ~pred-name [& ~'args]    ; A function returning a QueryAtom
        (QueryAtom.
-        (.getPredicate ~model (name '~pred-name)) ; Predicate from name
+        (p (name '~pred-name)) ; Predicate from name
         (into-array                               ; Array of Terms
          Term
          (for [~'a ~'args]
@@ -89,14 +94,14 @@
      (.addConstraint
       ~model
       ~constraint-type
-      {"on" (.getPredicate ~model (name '~predicate))
+      {"on" (p (name '~predicate))
        "name" ~cname})))
 
 (defn add-rule
   "Add a logical rule to the model."
   ;; Weighted
   ([model formula weight squared name]
-   (let [rule (WeightedLogicalRule. formula weight squared name)]
+   (let [rule (WeightedLogicalRule. formula (float weight) squared name)]
      (.addRule model rule)))
   ;; Unweighted
   ([model formula name]
@@ -106,13 +111,13 @@
 (defn add-rule-string
   "Add a rule formatted as a string to the model."
   ([model datastore rule-string weight squared name]
-   (let [partial-rule (ModelLoader/loadRulePartial datastore rule-string)
+   (let [partial-rule (ModelLoader/loadRulePartial rule-string)
          rule (do (assert (not (.isRule partial-rule)))
-                  (.toRule partial-rule weight squared))]
+                  (.toRule partial-rule (float weight) squared))]
      (.setName rule name)
      (.addRule model rule)))
   ([model datastore rule-string name]
-   (let [partial-rule (ModelLoader/loadRulePartial datastore rule-string)
+   (let [partial-rule (ModelLoader/loadRulePartial rule-string)
          rule (do (assert (.isRule partial-rule))
                   (.toRule partial-rule))]
      (.setName rule name)
@@ -224,7 +229,7 @@
 (defn model-new
   "Return a new PSLModel associated with the given DataStore."
   [data-store]
-  (Model. "" data-store))
+  (Model. data-store))
 
 (defn model-print
   "Print the given model."
@@ -259,29 +264,25 @@
 (defn open-db
   "Return an open PSL database."
   ([datastore model parts-to-read part-to-write preds-to-close]
-     {:pre [(not-any? nil? [datastore model parts-to-read part-to-write preds-to-close])]}
-     (let [parts-to-read (into-array Partition parts-to-read)
-           preds-to-close (HashSet.
-                           (for [pname preds-to-close]
-                             (.getPredicate model pname)))]
-       (.getDatabase datastore part-to-write preds-to-close parts-to-read)))
+   {:pre [(not-any? nil? [datastore model parts-to-read part-to-write preds-to-close])]}
+   (let [parts-to-read (into-array Partition parts-to-read)
+         preds-to-close (HashSet.
+                         (for [pname preds-to-close]
+                           (p pname)))]
+     (.getDatabase datastore part-to-write preds-to-close parts-to-read)))
 
   ;; No predicates to close
   ([datastore model parts-to-read part-to-write]
-     {:pre [(not-any? nil? [datastore model parts-to-read part-to-write])]}
-     (let [parts-to-read (into-array Partition parts-to-read)]
-       (.getDatabase datastore part-to-write parts-to-read)))
+   {:pre [(not-any? nil? [datastore model parts-to-read part-to-write])]}
+   (let [parts-to-read (into-array Partition parts-to-read)]
+     (.getDatabase datastore part-to-write parts-to-read)))
 
   ;; No predicates to close or write partition
   ([datastore model parts-to-read]
-     {:pre [(not-any? nil? [datastore model parts-to-read])]}
-     (let [parts-to-read (into-array Partition parts-to-read)]
-       (.getDatabase datastore (first parts-to-read) parts-to-read))))
+   {:pre [(not-any? nil? [datastore model parts-to-read])]}
+   (let [parts-to-read (into-array Partition parts-to-read)]
+     (.getDatabase datastore (first parts-to-read) parts-to-read))))
 
-(defn p
-  "Get a predicate object from the PSL model"
-  [model pred-name]
-  (.getPredicate model pred-name))
 
 ;;; =============== Functions for handling PSL partitions ====================
 
@@ -292,7 +293,7 @@
         dbw (open-db datastore model [part-to] part-to)]
     (try
       (doseq [pnam preds]
-        (let [atoms (.getAllGroundAtoms dbr (p model pnam))]
+        (let [atoms (.getAllGroundAtoms dbr (p pnam))]
           (doseq [atom atoms]
             (.commit dbw atom))))
       nil
@@ -412,7 +413,7 @@
   "Read a table from the PSL DB"
   ;; With a supplied database
   ([model db pred-name include-value]
-   (let [atoms (.getAllGroundAtoms db (p model pred-name))
+   (let [atoms (.getAllGroundAtoms db (p pred-name))
          col-ns (pred-col-names model pred-name)]
      (if include-value
        (in/dataset (conj col-ns :value)
@@ -437,8 +438,8 @@
   "Round atoms of open predicates using conditional probabilities, per
   Bach et al, 2015 and Goemans and D. P. Williamson., 1994."
   [database model open-predicates]
-  (let [mgrs (AtomRegisterGroundRuleStore.)]
-    (Grounding/groundAll model (PersistedAtomManager. database) mgrs) 
+  (let [mgrs (MemoryGroundRuleStore.)]
+    (Grounding/groundAll (.getRules model) (PersistedAtomManager. database) mgrs) 
 
     ;; Round random variable (open) atoms
     (doseq [rv-pred open-predicates]
