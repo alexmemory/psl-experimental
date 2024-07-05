@@ -1,4 +1,4 @@
-(defproject psl-clojure/lein-template "2.1.0-SNAPSHOT"
+(defproject psl-clojure/lein-template "2.4.0"
   :description "FIXME: write description"
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"
